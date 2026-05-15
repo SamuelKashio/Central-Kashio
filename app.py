@@ -321,7 +321,8 @@ def procesar(df_raw):
     df=df_raw.copy()
     for col in ["duration","ring_time"]: df[col]=pd.to_numeric(df.get(col,0),errors="coerce").fillna(0).astype(int)
     for col in ["detect_time","connect_time","disconnect_time"]:
-        if col in df.columns: df[col]=pd.to_datetime(df[col].replace("",None),errors="coerce")
+        if col in df.columns:
+            df[col]=pd.to_datetime(df[col].replace("",None),errors="coerce")+pd.Timedelta(hours=5)
     for col in ["ani_user","dnis_user","ref_callid","original_callid"]:
         if col in df.columns: df[col]=df[col].astype(str).str.strip()
     if "type" not in df.columns: df["type"]=""
@@ -711,6 +712,12 @@ if live_mode:
     cols_ag=st.columns(3)
     for i,(ag_id,ag_nombre) in enumerate(get_agentes_sin_central().items()):
         llamada=next((cc for cc in llamadas_activas if cc["ag_id"]==ag_id),None)
+        # Estado de login (supervisión)
+        _est_log = obtener_estado_actual_agente(_df_sal_rec, ag_id) if not _df_sal_rec.empty else {"estado":"Desconocido","desde":None,"duracion":"—"}
+        _log_color = c["green"] if _est_log["estado"]=="Online" else c["red"] if _est_log["estado"]=="Offline" else c["muted"]
+        _log_desde = _est_log["desde"].strftime("%H:%M") if _est_log["desde"] else "—"
+        _log_dur   = _est_log["duracion"]
+        _log_badge = f"<span style='font-size:10px;color:{_log_color};font-family:JetBrains Mono,monospace'>{'🟢 Conectado' if _est_log['estado']=='Online' else '🔴 Desconectado' if _est_log['estado']=='Offline' else '⚪ Sin datos'} · {_log_desde} · {_log_dur}</span>"
         if llamada is None:
             dot,borde=c["green"],c["green_border"]
             estado_h=f"<span style='color:{c['green_dim']};font-size:11px;letter-spacing:1px;font-family:JetBrains Mono,monospace'>🟢 LIBRE</span>"
@@ -746,7 +753,8 @@ if live_mode:
               <div style='display:flex;justify-content:space-between;align-items:flex-start'>
                 <div><div style='color:{c['text']};font-size:14px;font-weight:500'>{ag_nombre}</div>
                 <div style='color:{c['muted2']};font-size:10px;font-family:JetBrains Mono,monospace;margin-top:2px'>ID {ag_id}</div></div>
-                <div>{estado_h}</div></div>{det_h}</div>""",unsafe_allow_html=True)
+                <div>{estado_h}</div></div>{det_h}
+              <div style='margin-top:10px;padding-top:8px;border-top:1px solid {c["border2"]}'>{_log_badge}</div></div>""",unsafe_allow_html=True)
 
     sin_asignar = [cc for cc in llamadas_activas if not cc["agente_conocido"]]
     sin_asignar = [cc for cc in llamadas_activas if not cc["agente_conocido"]]
