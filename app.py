@@ -589,6 +589,7 @@ if live_mode:
     if "notif_ids_vistos"   not in st.session_state: st.session_state.notif_ids_vistos=set()
     if "notif_sin_devolver" not in st.session_state: st.session_state.notif_sin_devolver={}
     _ahora=now_lima(); _hace6=(_ahora-timedelta(minutes=6)).strftime("%Y-%m-%d %H:%M:%S"); _hasta=_ahora.strftime("%Y-%m-%d %H:%M:%S")
+    _hoy_inicio=_ahora.replace(hour=0,minute=0,second=0,microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
     _debug_info=""
     try:
         _df_rec,_=fetch_cdrs(date_start=_hace6,date_end=_hasta)
@@ -597,6 +598,13 @@ if live_mode:
             _debug_info=f"CDRs últimos 6 min: {len(_df_rec)} registros · {len(_df_rec_proc)} entrantes"
         else: _df_rec_proc,_df_sal_rec=pd.DataFrame(),pd.DataFrame(); _debug_info="Sin CDRs en últimos 6 min"
     except Exception as _ex: _df_rec_proc,_df_sal_rec=pd.DataFrame(),pd.DataFrame(); _debug_info=f"Error: {_ex}"
+    # Fetch del dia completo para detectar login/logout (*34/*33)
+    try:
+        _df_hoy,_=fetch_cdrs(date_start=_hoy_inicio,date_end=_hasta)
+        if _df_hoy is not None and not _df_hoy.empty:
+            _,_df_sal_hoy,_=procesar(_df_hoy)
+        else: _df_sal_hoy=pd.DataFrame()
+    except: _df_sal_hoy=pd.DataFrame()
     _notif_js=[]
     if not _df_rec_proc.empty and "escenario" in _df_rec_proc.columns:
         for _,_row in _df_rec_proc[(_df_rec_proc["atendida"]==False)&(_df_rec_proc["escenario"].isin(ESC_RESPONSABLE))].iterrows():
@@ -713,11 +721,21 @@ if live_mode:
     for i,(ag_id,ag_nombre) in enumerate(get_agentes_sin_central().items()):
         llamada=next((cc for cc in llamadas_activas if cc["ag_id"]==ag_id),None)
         # Estado de login (supervisión)
-        _est_log = obtener_estado_actual_agente(_df_sal_rec, ag_id) if not _df_sal_rec.empty else {"estado":"Desconocido","desde":None,"duracion":"—"}
-        _log_color = c["green"] if _est_log["estado"]=="Online" else c["red"] if _est_log["estado"]=="Offline" else c["muted"]
-        _log_desde = _est_log["desde"].strftime("%H:%M") if _est_log["desde"] else "—"
-        _log_dur   = _est_log["duracion"]
-        _log_badge = f"<span style='font-size:10px;color:{_log_color};font-family:JetBrains Mono,monospace'>{'🟢 Conectado' if _est_log['estado']=='Online' else '🔴 Desconectado' if _est_log['estado']=='Offline' else '⚪ Sin datos'} · {_log_desde} · {_log_dur}</span>"
+        _est_log = obtener_estado_actual_agente(_df_sal_hoy, ag_id) if not _df_sal_hoy.empty else {"estado":"Desconocido","desde":None,"duracion":"—"}
+        _online   = _est_log["estado"]=="Online"
+        _offline  = _est_log["estado"]=="Offline"
+        _log_color= c["green"] if _online else c["red"] if _offline else c["muted"]
+        _log_gbg  = "rgba(34,197,94,.08)" if _online else "rgba(239,68,68,.08)" if _offline else "rgba(255,255,255,.03)"
+        _log_desde= _est_log["desde"].strftime("%H:%M") if _est_log["desde"] else "—"
+        _log_dur  = _est_log["duracion"]
+        _log_txt  = "CONECTADO" if _online else "DESCONECTADO" if _offline else "SIN DATOS"
+        _log_icon = "●" if _online else "●" if _offline else "○"
+        _log_badge= (f"<div style='display:flex;align-items:center;justify-content:space-between;"
+                     f"background:{_log_gbg};border-radius:6px;padding:6px 10px;margin-top:10px'>"
+                     f"<span style='color:{_log_color};font-size:11px;font-weight:600;font-family:JetBrains Mono,monospace'>"
+                     f"{_log_icon} {_log_txt}</span>"
+                     f"<span style='color:{c['muted2']};font-size:10px;font-family:JetBrains Mono,monospace'>"
+                     f"desde {_log_desde} &nbsp;·&nbsp; {_log_dur}</span></div>")
         if llamada is None:
             dot,borde=c["green"],c["green_border"]
             estado_h=f"<span style='color:{c['green_dim']};font-size:11px;letter-spacing:1px;font-family:JetBrains Mono,monospace'>🟢 LIBRE</span>"
@@ -754,7 +772,7 @@ if live_mode:
                 <div><div style='color:{c['text']};font-size:14px;font-weight:500'>{ag_nombre}</div>
                 <div style='color:{c['muted2']};font-size:10px;font-family:JetBrains Mono,monospace;margin-top:2px'>ID {ag_id}</div></div>
                 <div>{estado_h}</div></div>{det_h}
-              <div style='margin-top:10px;padding-top:8px;border-top:1px solid {c["border2"]}'>{_log_badge}</div></div>""",unsafe_allow_html=True)
+              {_log_badge}</div>""",unsafe_allow_html=True)
 
     sin_asignar = [cc for cc in llamadas_activas if not cc["agente_conocido"]]
     sin_asignar = [cc for cc in llamadas_activas if not cc["agente_conocido"]]
