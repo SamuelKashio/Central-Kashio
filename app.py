@@ -396,15 +396,15 @@ with st.sidebar:
         for aid, info in st.session_state.cfg_agentes.items():
             if info.get("es_central"): continue
             col_a, col_e = st.columns([4, 1])
-            with col_a: st.session_state.cfg_agentes[aid]["nombre"] = st.text_input(f"ID {aid}", value=info["nombre"], label_visibility="collapsed")
-            with col_e: st.session_state.cfg_agentes[aid]["activo"] = st.checkbox("", value=info.get("activo", True), label_visibility="collapsed")
+            with col_a: st.session_state.cfg_agentes[aid]["nombre"] = st.text_input(f"ID {aid}", value=info["nombre"], key=f"nombre_{aid}", label_visibility="collapsed")
+            with col_e: st.session_state.cfg_agentes[aid]["activo"] = st.checkbox("", value=info.get("activo", True), key=f"activo_{aid}", label_visibility="collapsed")
     with tab_cfg[2]:
         st.markdown("**Turnos**")
         for i, t in enumerate(st.session_state.cfg_turnos):
             st.markdown(f"**Turno {i+1}**")
             col_a, col_b = st.columns(2)
-            with col_a: st.session_state.cfg_turnos[i]["agente"] = st.text_input(f"Agente {i}", value=t["agente"], label_visibility="collapsed")
-            with col_b: st.session_state.cfg_turnos[i]["h_ini"] = st.number_input(f"Inicio {i}", value=t["h_ini"], min_value=0, max_value=30, label_visibility="collapsed")
+            with col_a: st.session_state.cfg_turnos[i]["agente"] = st.text_input(f"Agente {i}", value=t["agente"], key=f"turno_agente_{i}", label_visibility="collapsed")
+            with col_b: st.session_state.cfg_turnos[i]["h_ini"] = st.number_input(f"Inicio {i}", value=t["h_ini"], min_value=0, max_value=30, key=f"turno_hini_{i}", label_visibility="collapsed")
     with tab_cfg[3]:
         st.markdown("**Numeros excluidos**")
         nums_txt = st.text_area("Un numero por linea", value="\n".join(get_nums_excluidos()), height=100)
