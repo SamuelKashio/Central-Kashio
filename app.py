@@ -375,16 +375,19 @@ def calcular_cumplimiento(df_ent,df_sal):
     return pd.DataFrame(resultados)
 
 # ── Supervisión: Login/Logout ──────────────────────────────────────────────────
+# df_sal tiene columnas: detect_time, agente, ani_user, numero_cliente, atendida, duration, hora, fecha
 def detectar_eventos_login_logout(df_sal):
     if df_sal is None or df_sal.empty: return pd.DataFrame()
     ev = df_sal[df_sal["numero_cliente"].astype(str).isin(["*34","*33"])].copy()
     if ev.empty: return pd.DataFrame()
     ev["tipo_evento"] = ev["numero_cliente"].map({"*34":"LOGIN","*33":"LOGOUT"})
-    return ev.sort_values("detect_time",ascending=False)[["detect_time","agente","agente_id","numero_cliente","tipo_evento","duracion"]]
+    cols = [c for c in ["detect_time","agente","ani_user","numero_cliente","tipo_evento","duration"] if c in ev.columns]
+    return ev.sort_values("detect_time",ascending=False)[cols]
 
 def calcular_sesiones_agente(df_sal, agent_id):
+    # agent_id corresponde a ani_user en df_sal
     if df_sal is None or df_sal.empty: return []
-    ev = df_sal[(df_sal["agente_id"]==agent_id) & (df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))].copy().sort_values("detect_time")
+    ev = df_sal[(df_sal["ani_user"]==agent_id) & (df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))].copy().sort_values("detect_time")
     if ev.empty: return []
     sesiones=[]; login_time=None
     for _,evt in ev.iterrows():
@@ -393,18 +396,18 @@ def calcular_sesiones_agente(df_sal, agent_id):
         elif str(evt["numero_cliente"])=="*33" and login_time:
             logout_time=evt["detect_time"]
             dur_s=(logout_time-login_time).total_seconds()
-            lls=df_sal[(df_sal["agente_id"]==agent_id)&(df_sal["detect_time"]>=login_time)&(df_sal["detect_time"]<=logout_time)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
+            lls=df_sal[(df_sal["ani_user"]==agent_id)&(df_sal["detect_time"]>=login_time)&(df_sal["detect_time"]<=logout_time)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
             sesiones.append({"fecha":login_time.date(),"login":login_time,"logout":logout_time,"duracion_minutos":int(dur_s/60),"llamadas_totales":len(lls),"llamadas_atendidas":int((lls["atendida"]==True).sum())})
             login_time=None
     if login_time:
         logout_time=now_lima(); dur_s=(logout_time-login_time).total_seconds()
-        lls=df_sal[(df_sal["agente_id"]==agent_id)&(df_sal["detect_time"]>=login_time)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
+        lls=df_sal[(df_sal["ani_user"]==agent_id)&(df_sal["detect_time"]>=login_time)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
         sesiones.append({"fecha":login_time.date(),"login":login_time,"logout":None,"duracion_minutos":int(dur_s/60),"llamadas_totales":len(lls),"llamadas_atendidas":int((lls["atendida"]==True).sum()),"activa":True})
     return sesiones
 
 def obtener_estado_actual_agente(df_sal, agent_id):
     if df_sal is None or df_sal.empty: return {"estado":"Desconocido","desde":None,"duracion":"—"}
-    ev=df_sal[(df_sal["agente_id"]==agent_id)&(df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))].sort_values("detect_time",ascending=False)
+    ev=df_sal[(df_sal["ani_user"]==agent_id)&(df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))].sort_values("detect_time",ascending=False)
     if ev.empty: return {"estado":"Desconocido","desde":None,"duracion":"—"}
     ult=ev.iloc[0]
     if str(ult["numero_cliente"])=="*34":
@@ -416,10 +419,11 @@ def calcular_metricas_supervisor(df_sal, agent_id):
     if df_sal is None or df_sal.empty: return {}
     hoy=now_lima().date()
     sesiones_hoy=[s for s in calcular_sesiones_agente(df_sal,agent_id) if s["fecha"]==hoy]
-    lls=df_sal[(df_sal["agente_id"]==agent_id)&(df_sal["detect_time"].dt.date==hoy)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
+    lls=df_sal[(df_sal["ani_user"]==agent_id)&(df_sal["detect_time"].dt.date==hoy)&(~df_sal["numero_cliente"].astype(str).isin(["*34","*33"]))]
     t_conectado=sum(s["duracion_minutos"] for s in sesiones_hoy)
     horas=t_conectado/60
-    return {"llamadas_totales":len(lls),"llamadas_atendidas":int((lls["atendida"]==True).sum()),"duracion_promedio":int(lls["duracion"].mean()) if len(lls)>0 else 0,"tiempo_conectado_minutos":t_conectado,"productividad":round(len(lls)/horas,2) if horas>0 else 0,"sesiones_hoy":len(sesiones_hoy)}
+    dur_prom=int(lls["duration"].mean()) if len(lls)>0 else 0
+    return {"llamadas_totales":len(lls),"llamadas_atendidas":int((lls["atendida"]==True).sum()),"duracion_promedio":dur_prom,"tiempo_conectado_minutos":t_conectado,"productividad":round(len(lls)/horas,2) if horas>0 else 0,"sesiones_hoy":len(sesiones_hoy)}
 
 # ── Panel configuración ────────────────────────────────────────────────────────
 def render_config(c):
