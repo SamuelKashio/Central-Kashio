@@ -322,7 +322,7 @@ def procesar(df_raw):
     for col in ["duration","ring_time"]: df[col]=pd.to_numeric(df.get(col,0),errors="coerce").fillna(0).astype(int)
     for col in ["detect_time","connect_time","disconnect_time"]:
         if col in df.columns:
-            df[col]=pd.to_datetime(df[col].replace("",None),errors="coerce")+pd.Timedelta(hours=5)
+            df[col]=pd.to_datetime(df[col].replace("",None),errors="coerce")+pd.Timedelta(hours=1)
     for col in ["ani_user","dnis_user","ref_callid","original_callid"]:
         if col in df.columns: df[col]=df[col].astype(str).str.strip()
     if "type" not in df.columns: df["type"]=""
